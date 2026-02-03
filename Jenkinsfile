@@ -35,6 +35,13 @@ pipeline {
             }
         }
 
+          stage('Package') {
+            steps {
+                echo 'Packaging the JAR file...'
+                sh 'mvn package -DskipTests'
+            }
+        }
+
         stage('Docker Build') {
             steps {
                 script {
@@ -43,12 +50,19 @@ pipeline {
             }
         }
 
-        stage('Package') {
+        stage('Deploy') {
+              //Deploy on docker container
             steps {
                 echo 'Packaging the JAR file...'
-                sh 'mvn package -DskipTests'
+                sh '''
+                    docker stop calculator-container || true 
+                    docker rm calculator-container || true
+                    docker run -d --name calculator-container -p 5090:8080 testing-demo:${env.BUILD_ID}
+                '''
             }
         }
+
+      
     }
 
     post {

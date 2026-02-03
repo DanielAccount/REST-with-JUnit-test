@@ -1,12 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        //From the port int the browser exact same 
-        maven 'maven3.9'
-        jdk 'jdk21'
-    }
-
     stages {
         stage('Checkout') {
             steps {

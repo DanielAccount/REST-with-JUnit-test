@@ -12,6 +12,6 @@ public class CalculatorServiceTest {
 
     @Test
     public void testSum(){
-        assertEquals(5, calculatorLogic.add(3,5));
+        assertEquals(8, calculatorLogic.add(3,5));
     }
 }

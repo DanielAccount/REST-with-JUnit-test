@@ -53,9 +53,7 @@ pipeline {
               //Deploy on docker container
             steps {
                 echo 'Packaging the JAR file...'
-                sh '''
-                    docker stop calculator-container || true 
-                    docker rm calculator-container || true
+                sh '''                 
                     docker run -d --name calculator-container -p 5090:8080 testing-demo:${env.BUILD_ID}
                 '''
             }

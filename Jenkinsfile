@@ -1,47 +1,76 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'maven3.9'
+    }
 
     stages {
-
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/AyeKyiPyar/welcome-jenkins.git'
+                echo 'Checking out source code...'
+                checkout scm
             }
         }
 
-        stage('Build') {
+        stage('Compile') {
             steps {
-                bat 'mvn clean compile'
+                echo 'Compiling the application...'
+                sh 'mvn compile'
             }
         }
 
-        stage('Test') {
+        stage('Unit Test') {
             steps {
-                bat 'mvn test'
+                echo 'Running JUnit Tests...'
+                // If tests fail, the pipeline stops here
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    // This archives the JUnit reports so Jenkins can display graphs
+                    junit '**/target/surefire-reports/*.xml'
+                }
             }
         }
 
-        stage('Package') {
+          stage('Package') {
             steps {
-                bat 'mvn package -DskipTests'
+                echo 'Packaging the JAR file...'
+                sh 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Run Application') {
+        stage('Docker Build') {
             steps {
-                bat 'java -jar target/app-0.0.1-SNAPSHOT.jar'
+                script {
+                    sh "docker build -t testing-demo:${env.BUILD_ID} ."
+                }
             }
         }
+
+      stage('Deploy') {
+            steps {
+                echo 'Deploying to Docker container...'
+                script {
+                    // 1. Stop and remove the old container if it exists
+                    sh "docker rm -f calculator-container || true"
+                    // Note: Changed port mapping to 5090:8080(local) to match your Dockerfile EXPOSE
+                    sh "docker run -d --name calculator-container -p 5090:8080 testing-demo:${env.BUILD_ID}"
+                }
+            }
+        }
+
+
     }
 
     post {
         success {
-            echo 'Build Successful!'
+            echo 'Build and Tests Passed Successfully!'
+            archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
         }
         failure {
-            echo 'Build Failed!'
+            echo 'Pipeline Failed. Check the logs and JUnit reports.'
         }
     }
 }

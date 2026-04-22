@@ -1,1 +1,4 @@
 com\practice\app\AppApplicationTests.class
+com\daniel\demo\acceptance\CucumberTest.class
+com\daniel\demo\acceptance\CucumberSpringConfiguration.class
+com\daniel\demo\acceptance\StepDefinitions.class

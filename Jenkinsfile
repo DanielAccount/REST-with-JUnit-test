@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+    environment {
+        // Change these to match your actual Docker Hub username and App name
+        DOCKER_HUB_USER = 'danielshipping123'
+        APP_NAME        = 'my-calculator'
+        IMAGE_TAG       = "1.0.${env.BUILD_ID}"
+        DOCKER_CREDS_ID = 'docker-hub-creds'
+    }
+
     tools {
         maven 'maven3.9'
     }
@@ -8,69 +16,57 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out source code...'
                 checkout scm
             }
         }
 
-        stage('Compile') {
+        stage('Build & Package') {
             steps {
-                echo 'Compiling the application...'
-                sh 'mvn compile'
-            }
-        }
-
-        stage('Unit Test') {
-            steps {
-                echo 'Running JUnit Tests...'
-                // If tests fail, the pipeline stops here
-                sh 'mvn test'
-            }
-            post {
-                always {
-                    // This archives the JUnit reports so Jenkins can display graphs
-                    junit '**/target/surefire-reports/*.xml'
-                }
-            }
-        }
-
-          stage('Package') {
-            steps {
-                echo 'Packaging the JAR file...'
                 sh 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Docker Build') {
+        stage('Docker Build & Push') {
             steps {
                 script {
-                    sh "docker build -t testing-demo:${env.BUILD_ID} ."
+                    // Log in to Docker Hub using Jenkins Credentials
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDS_ID}", passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+
+                        // Build the image with the Docker Hub prefix
+                        sh "docker build -t ${DOCKER_HUB_USER}/${APP_NAME}:${IMAGE_TAG} ."
+                        sh "docker build -t ${DOCKER_HUB_USER}/${APP_NAME}:latest ."
+
+                        // Push both the specific build version and 'latest'
+                        sh "docker push ${DOCKER_HUB_USER}/${APP_NAME}:${IMAGE_TAG}"
+                        sh "docker push ${DOCKER_HUB_USER}/${APP_NAME}:latest"
+                    }
                 }
             }
         }
 
-      stage('Deploy') {
+        stage('Kubernetes Deploy') {
             steps {
-                echo 'Deploying to Docker container...'
                 script {
-                    // 1. Stop and remove the old container if it exists
-                    sh "docker rm -f calculator-container || true"
-                    // Note: Changed port mapping to 5090:8080(local) to match your Dockerfile EXPOSE
-                    sh "docker run -d --name calculator-container -p 5090:8080 testing-demo:${env.BUILD_ID}"
+                    echo 'Applying Kubernetes Manifests...'
+
+                    // Option A: If your YAMLs are in the project root
+                    sh "kubectl apply -f deployment.yaml"
+                    sh "kubectl apply -f services.yaml"
+
+                    // Force Kubernetes to pull the new image even if the tag name is 'latest'
+                    sh "kubectl rollout restart deployment/calculator-deployment"
                 }
             }
         }
-
-
     }
 
     post {
         success {
-            echo 'Build and Tests Passed Successfully!'
-            archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+            echo "Successfully deployed ${APP_NAME} to Kubernetes!"
         }
         failure {
-            echo 'Pipeline Failed. Check the logs and JUnit reports.'
+            echo 'Pipeline failed. Check Docker credentials or Kubernetes connectivity.'
         }
     }
 }

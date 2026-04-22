@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: calculator-deployment
+spec:
+  # CHANGED: Starting with 1 replica is safer for local testing with RAM
+  replicas: 1
+  selector:
+    matchLabels:
+      app: calculator
+  template:
+    metadata:
+      labels:
+        app: calculator
+    spec:
+      containers:
+        - name: calculator
+          # CHANGED: Use YOUR image that you just pushed!
+          image: danielshipping123/my-calculator:1.0
+          ports:
+            - containerPort: 8080
+
+          # CHANGED: Path adjusted for your Servlet context below
+          readinessProbe:
+            httpGet:
+              path: /calculator/sum?a=1&b=2
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+          env:
+            # URL http://localhost:8081/calculator/...
+            - name: SERVER_SERVLET_CONTEXT_PATH
+              value: "/calculator"
+
+            - name: SPRINGDOC_API_DOCS_PATH
+              value: "/calculator/v3/api-docs"
+
+            - name: SPRINGDOC_SWAGGER_UI_PATH
+              value: "/calculator/swagger-ui.html"
